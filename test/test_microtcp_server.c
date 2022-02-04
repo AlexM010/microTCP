@@ -1,3 +1,12 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include "../lib/microtcp.h"
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h> // for close
 /*
  * microtcp, a lightweight implementation of TCP for teaching,
  * and academic purposes.
@@ -26,5 +35,31 @@
 int
 main(int argc, char **argv)
 {
+   
+    microtcp_sock_t sock=microtcp_socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP) ;
+    struct sockaddr_in sin;
+    struct sockaddr client;
+    socklen_t len =  sizeof(struct sockaddr);
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(atoi(argv[1]));
+    sin.sin_addr.s_addr = htonl(INADDR_ANY);
 
+
+    if(microtcp_bind(&sock,(struct sockaddr *) &sin,
+    sizeof(struct sockaddr_in)) ==  -1) {
+        perror("TCP bind");
+        exit(EXIT_FAILURE);
+    }
+    if(microtcp_accept(&sock,&client,len ) == -1){
+        printf("Cannot accept\n");
+        return -1;
+    }else
+        printf("TCP Connection Established\n");
+    if(microtcp_shutdown(&sock,SHUT_RDWR) ==-1){
+        perror("shutdown");
+        exit(EXIT_FAILURE);
+    }
+    printf("TCP connection closed\n");
+    return 0;
 }

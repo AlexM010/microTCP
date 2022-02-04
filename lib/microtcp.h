@@ -43,6 +43,7 @@
  */
 typedef enum
 {
+  UNKNOWN,
   LISTEN,
   ESTABLISHED,
   CLOSING_BY_PEER,
@@ -50,7 +51,10 @@ typedef enum
   CLOSED,
   INVALID
 } mircotcp_state_t;
-
+typedef enum{
+  TRUE,
+  FALSE
+}Bool;
 
 /**
  * This is the microTCP socket structure. It holds all the necessary
@@ -70,10 +74,11 @@ typedef struct
                                      is freed at the shutdown of the connection. This buffer is used
                                      to retrieve the data from the network. */
   size_t buf_fill_level;        /**< Amount of data in the buffer */
-
+  struct sockaddr *address;
+  socklen_t address_len;
   size_t cwnd;
   size_t ssthresh;
-
+  Bool shuts;
   size_t seq_number;            /**< Keep the state of the sequence number */
   size_t ack_number;            /**< Keep the state of the ack number */
   uint64_t packets_send;
