@@ -30,8 +30,37 @@
 #include <arpa/inet.h> 
 #include <ctype.h>
 #include <stdlib.h>
+  // 000 0  0 0 0 0 0 0 0 0 ACK=0 0 SYN=1 FIN=0
  
+microtcp_header_t create_header (uint32_t seq, uint16_t control, uint32_t data_len,  uint32_t ack, uint16_t window, uint32_t checksum) {
+  microtcp_header_t msg;
 
+  msg.seq_number=htonl(seq);
+  msg.control=htons(control);
+  msg.data_len=htonl(data_len);
+  msg.ack_number=htonl(ack);
+  msg.window=htons(window);
+  msg.future_use0=0;
+  msg.future_use1=0;
+  msg.future_use2=0;
+  msg.checksum=htonl(checksum);
+
+  return msg;                              
+}
+
+microtcp_header_t reverse(microtcp_header_t msg) {
+  msg.seq_number=ntohl(msg.seq_number);
+  msg.control=ntohs(msg.control);
+  msg.data_len=ntohl(msg.data_len);
+  msg.ack_number=ntohl(msg.ack_number);
+  msg.window=ntohs(msg.window);
+  msg.future_use0=ntohl(msg.future_use0);
+  msg.future_use1=ntohl(msg.future_use1);
+  msg.future_use2=ntohl(msg.future_use2);
+  msg.checksum=ntohl(msg.checksum);
+
+  return msg;
+}
  
 microtcp_sock_t
 microtcp_socket (int domain, int type, int protocol)
@@ -81,21 +110,13 @@ microtcp_connect (microtcp_sock_t *socket, const struct sockaddr *address,
     buf[i]=0;
   socket->address=(struct sockaddr*)address;
   socket->address_len=address_len;
- 
   socket->seq_number=rand()%10000;
-  msg.seq_number=htonl(socket->seq_number);
-  // 000 0  0 0 0 0 0 0 0 0 ACK=0 0 SYN=1 FIN=0
-  msg.control=htons((uint16_t)2);
-  msg.data_len=0;
-  msg.ack_number=0;
-  msg.window=0;
-  msg.future_use0=0;
-  msg.future_use1=0;
-  msg.future_use2=0;
-  msg.checksum=0;
+
+  // 000 0  0 0 0 0 0 0 0 0 ACK=0 0 SYN=1 FIN=0  ==  2
+  msg = create_header(socket->seq_number, (uint16_t)2, 0, 0, 0, 0);
   //copy the header to the buffer
   memcpy (buf,&msg, sizeof(microtcp_header_t));
-  msg.checksum=htonl(crc32((const uint8_t *)&msg, sizeof(microtcp_header_t)));
+  msg.checksum=htonl( crc32((const uint8_t *)&msg, sizeof(microtcp_header_t)));
   tmp=sendto(socket->sd,(void*)&msg,sizeof(microtcp_header_t),0,address,address_len);
   if (tmp<0) {
     perror("Cant Establish socket");
@@ -109,26 +130,17 @@ microtcp_connect (microtcp_sock_t *socket, const struct sockaddr *address,
     return -1;
   }
 
-
   memcpy(&rec,buf,sizeof(microtcp_header_t));
   int check=rec.checksum;
   rec.checksum=0;
 
-   if((uint32_t)check!=ntohl(crc32((const uint8_t *)&rec,sizeof(microtcp_header_t)))){
+  if((uint32_t)check!=ntohl(crc32((const uint8_t *)&rec,sizeof(microtcp_header_t)))){
     perror("Received packet destroyed1");
     socket->state=INVALID;
     return -1;
   }
-  rec.seq_number=ntohl(rec.seq_number);
-  rec.control=ntohs(rec.control);
-  rec.data_len=ntohl(rec.data_len);
-  rec.ack_number=ntohl(rec.ack_number);
-  rec.window=ntohs(rec.window);
-  rec.future_use0=ntohl(rec.future_use0);
-  rec.future_use1=ntohl(rec.future_use1);
-  rec.future_use2=ntohl(rec.future_use2);
-  rec.checksum=ntohl(rec.checksum);
 
+  rec = reverse(rec);
   if(rec.control!=(uint16_t)10){
     perror("Server did not accept connection");
     socket->state=INVALID;
@@ -143,17 +155,8 @@ microtcp_connect (microtcp_sock_t *socket, const struct sockaddr *address,
   socket->ack_number=rec.seq_number+1;
   socket->seq_number++;
   socket->curr_win_size=rec.window;
-  msg.seq_number=htonl(socket->seq_number);
-  // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=0
-  msg.control=htons((uint16_t)8); //possible error
-  msg.data_len=0;
-  msg.ack_number=htonl(socket->ack_number);
-  msg.window=htonl(socket->init_win_size);
-  msg.future_use0=0;
-  msg.future_use1=0;
-  msg.future_use2=0;
-  msg.checksum=0;
-
+  // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=0  ==  8
+  msg = create_header(socket->seq_number, (uint16_t)8, 0, socket->ack_number, socket->init_win_size, 0);
   memset(buf,0,MICROTCP_RECVBUF_LEN);
   memcpy(buf,&msg,sizeof(microtcp_header_t));
   msg.checksum=htonl(crc32((const uint8_t *)buf, sizeof(microtcp_header_t)));
@@ -192,20 +195,13 @@ microtcp_accept (microtcp_sock_t *socket, struct sockaddr *address,
   int check=rec.checksum;
   rec.checksum=0;
 
-   if((uint32_t)check!=ntohl(crc32((const uint8_t *)&rec,sizeof(microtcp_header_t)))){
+  if((uint32_t)check!=ntohl(crc32((const uint8_t *)&rec,sizeof(microtcp_header_t)))){
     perror("Received packet destroyed3");
     socket->state=INVALID;
     return -1;
   }
-  rec.seq_number=ntohl(rec.seq_number);
-  rec.control=ntohs(rec.control);
-  rec.data_len=ntohl(rec.data_len);
-  rec.ack_number=ntohl(rec.ack_number);
-  rec.window=ntohs(rec.window);
-  rec.future_use0=ntohl(rec.future_use0);
-  rec.future_use1=ntohl(rec.future_use1);
-  rec.future_use2=ntohl(rec.future_use2);
 
+  rec = reverse(rec);
 
   if(rec.control!=(uint16_t)2){
     perror("Packet has not SYN=1");
@@ -216,16 +212,8 @@ microtcp_accept (microtcp_sock_t *socket, struct sockaddr *address,
   seq=rand()%10000;
   ack=rec.seq_number+1;
 
-  msg.seq_number=htonl(seq);
-  // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=1 FIN=0
-  msg.control=htons((uint16_t)10); //possible error
-  msg.data_len=0;
-  msg.ack_number=htonl(ack);
-  msg.window=htonl(socket->curr_win_size);
-  msg.future_use0=0;
-  msg.future_use1=0;
-  msg.future_use2=0;
-  msg.checksum=0;
+  // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=1 FIN=0  ==  10
+  msg = create_header(seq, (uint16_t)10, 0, ack, socket->curr_win_size, 0);
   memset(buf,0,MICROTCP_RECVBUF_LEN);
   memcpy(buf,&msg,sizeof(microtcp_header_t));
   msg.checksum=htonl(crc32((const uint8_t *)buf, sizeof(microtcp_header_t)));
@@ -247,21 +235,13 @@ microtcp_accept (microtcp_sock_t *socket, struct sockaddr *address,
   check=rec.checksum;
   rec.checksum=0;
 
-   if((uint32_t)check!=ntohl(crc32((const uint8_t *)&rec,sizeof(microtcp_header_t)))){
+  if((uint32_t)check!=ntohl(crc32((const uint8_t *)&rec,sizeof(microtcp_header_t)))){
     perror("Received packet destroyed4");
     socket->state=INVALID;
     return -1;
   }
-  rec.seq_number=ntohl(rec.seq_number);
-  rec.control=ntohs(rec.control);
-  rec.data_len=ntohl(rec.data_len);
-  rec.ack_number=ntohl(rec.ack_number);
-  rec.window=ntohs(rec.window);
-  rec.future_use0=ntohl(rec.future_use0);
-  rec.future_use1=ntohl(rec.future_use1);
-  rec.future_use2=ntohl(rec.future_use2);
-  rec.checksum=ntohl(rec.checksum);
- 
+  
+  rec = reverse(rec);
   if(rec.control!=(uint16_t)8){
     perror("Packet has not ACK=1");
     socket->state=INVALID;
@@ -276,12 +256,8 @@ microtcp_accept (microtcp_sock_t *socket, struct sockaddr *address,
   socket->seq_number=seq+1;
   socket->ack_number=ack+1;
   //coping received data to servers buffer for later
-  /*
-  socket->recvbuf=malloc(MICROTCP_RECVBUF_LEN);
-  memcpy(buf+sizeof(microtcp_header_t),socket->recvbuf,rec.data_len);
-  socket->buf_fill_len=rec.data_len;
-  socket->curr_win_size-=rec.data_len;
-  */
+  
+  socket->recvbuf=malloc(MICROTCP_RECVBUF_LEN);  
   socket->state=ESTABLISHED;
   return 0;
 }
@@ -295,16 +271,8 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
   microtcp_header_t rec;
   uint8_t buf[MICROTCP_RECVBUF_LEN]={0};
   if(socket->shuts==TRUE){
-    msg.seq_number=htonl(socket->seq_number);
-    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=1
-    msg.control=htons((uint16_t)9); //possible error
-    msg.data_len=0;
-    msg.ack_number=htonl(socket->ack_number);
-    msg.window=htonl(socket->curr_win_size);
-    msg.future_use0=0;
-    msg.future_use1=0;
-    msg.future_use2=0;
-    msg.checksum=0;
+    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=1  ==  9
+    msg = create_header(socket->seq_number, (uint16_t)9, 0, socket->ack_number, socket->curr_win_size, 0);
     memset(buf,0,MICROTCP_RECVBUF_LEN);
     memcpy(buf,&msg,sizeof(microtcp_header_t));
     msg.checksum=htonl(crc32((const uint8_t *)buf, sizeof(microtcp_header_t)));
@@ -329,16 +297,7 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
       socket->state=INVALID;
       return -1;
     }
-    rec.seq_number=ntohl(rec.seq_number);
-    rec.control=ntohs(rec.control);
-    rec.data_len=ntohl(rec.data_len);
-    rec.ack_number=ntohl(rec.ack_number);
-    rec.window=ntohs(rec.window);
-    rec.future_use0=ntohl(rec.future_use0);
-    rec.future_use1=ntohl(rec.future_use1);
-    rec.future_use2=ntohl(rec.future_use2);
-    rec.checksum=ntohl(rec.checksum);
-    
+    rec = reverse(rec);
     if(rec.control!=(uint16_t)8){
       perror("Packet has not ACK=1");
       socket->state=INVALID;
@@ -366,31 +325,15 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
       socket->state=INVALID;
       return -1;
     }
-    rec.seq_number=ntohl(rec.seq_number);
-    rec.control=ntohs(rec.control);
-    rec.data_len=ntohl(rec.data_len);
-    rec.ack_number=ntohl(rec.ack_number);
-    rec.window=ntohs(rec.window);
-    rec.future_use0=ntohl(rec.future_use0);
-    rec.future_use1=ntohl(rec.future_use1);
-    rec.future_use2=ntohl(rec.future_use2);
-    rec.checksum=ntohl(rec.checksum);
+    rec = reverse(rec);
     if(rec.control!=(uint16_t)9){
       perror("Packet has not ACK=1 and FIN=1");
       socket->state=INVALID;
       return -1;
     }
     socket->ack_number=rec.seq_number;
-    msg.seq_number=htonl(socket->seq_number);
-    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=0
-    msg.control=htons((uint16_t)8); //possible error
-    msg.data_len=0;
-    msg.ack_number=htonl(++socket->ack_number);
-    msg.window=htonl(socket->curr_win_size);
-    msg.future_use0=0;
-    msg.future_use1=0;
-    msg.future_use2=0;
-    msg.checksum=0;
+    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=0  == 8
+    msg = create_header(socket->seq_number, (uint16_t)8, 0, ++socket->ack_number, socket->curr_win_size, 0);
     memset(buf,0,MICROTCP_RECVBUF_LEN);
     memcpy(buf,&msg,sizeof(microtcp_header_t));
     msg.checksum=htonl(crc32((const uint8_t *)buf, sizeof(microtcp_header_t)));
@@ -401,7 +344,6 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
       return -1;
     }
     socket->state=CLOSED;
-
   }else{
     memset(buf,0,MICROTCP_RECVBUF_LEN);
     if(tmp_len=recvfrom(socket->sd,buf,MICROTCP_RECVBUF_LEN,0,(struct sockaddr*)socket->address,&socket->address_len)<0){
@@ -417,31 +359,15 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
       socket->state=INVALID;
       return -1;
     }
-    rec.seq_number=ntohl(rec.seq_number);
-    rec.control=ntohs(rec.control);
-    rec.data_len=ntohl(rec.data_len);
-    rec.ack_number=ntohl(rec.ack_number);
-    rec.window=ntohs(rec.window);
-    rec.future_use0=ntohl(rec.future_use0);
-    rec.future_use1=ntohl(rec.future_use1);
-    rec.future_use2=ntohl(rec.future_use2);
-    rec.checksum=ntohl(rec.checksum);
+    rec = reverse(rec);
     if(rec.control!=(uint16_t)9){
       perror("Packet has not ACK=1 and FIN=1");
       socket->state=INVALID;
       return -1;
     }
     socket->ack_number=rec.seq_number;
-    msg.seq_number=htonl(socket->seq_number);
-    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=0
-    msg.control=htons((uint16_t)8); //possible error
-    msg.data_len=0;
-    msg.ack_number=htonl(socket->ack_number);
-    msg.window=htonl(socket->curr_win_size);
-    msg.future_use0=0;
-    msg.future_use1=0;
-    msg.future_use2=0;
-    msg.checksum=0;
+    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=0  == 8
+    msg = create_header(socket->seq_number, (uint16_t)8, 0, socket->ack_number, socket->curr_win_size, 0);
     memset(buf,0,MICROTCP_RECVBUF_LEN);
     memcpy(buf,&msg,sizeof(microtcp_header_t));
     msg.checksum=htonl(crc32((const uint8_t *)buf, sizeof(microtcp_header_t)));
@@ -452,16 +378,8 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
       return -1;
     }
     socket->state=CLOSING_BY_PEER;
-    msg.seq_number=htonl(socket->seq_number);
-    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=1
-    msg.control=htons((uint16_t)9); //possible error
-    msg.data_len=0;
-    msg.ack_number=htonl(socket->ack_number);
-    msg.window=htonl(socket->curr_win_size);
-    msg.future_use0=0;
-    msg.future_use1=0;
-    msg.future_use2=0;
-    msg.checksum=0;
+    // 000 0  0 0 0 0 0 0 0 0 ACK=1 0 SYN=0 FIN=1  ==  9
+    msg = create_header(socket->seq_number, (uint16_t)9, 0, socket->ack_number, socket->curr_win_size, 0);
     memset(buf,0,MICROTCP_RECVBUF_LEN);
     memcpy(buf,&msg,sizeof(microtcp_header_t));
     msg.checksum=htonl(crc32((const uint8_t *)buf, sizeof(microtcp_header_t)));
@@ -485,16 +403,7 @@ microtcp_shutdown (microtcp_sock_t *socket, int how)
       socket->state=INVALID;
       return -1;
     }
-    rec.seq_number=ntohl(rec.seq_number);
-    rec.control=ntohs(rec.control);
-    rec.data_len=ntohl(rec.data_len);
-    rec.ack_number=ntohl(rec.ack_number);
-    rec.window=ntohs(rec.window);
-    rec.future_use0=ntohl(rec.future_use0);
-    rec.future_use1=ntohl(rec.future_use1);
-    rec.future_use2=ntohl(rec.future_use2);
-    rec.checksum=ntohl(rec.checksum);
-
+    rec = reverse(rec);
     if(rec.control!=(uint16_t)8){
       perror("Packet has not ACK=1");
       socket->state=INVALID;
@@ -515,7 +424,75 @@ ssize_t
 microtcp_send (microtcp_sock_t *socket, const void *buffer, size_t length,
                int flags)
 {
-  /* Your code here */
+  size_t remaining=length;
+  size_t data_sent=0;
+  size_t bytes_to_send=0;
+  size_t chunks=0;
+  microtcp_header_t header;
+  void *data=NULL;
+  while(data_sent < length){
+    bytes_to_send = min(socket->curr_win_size , socket->cwnd, remaining);
+    chunks = bytes_to_send / MICROTCP_MSS;
+    data=malloc(MICROTCP_MSS+sizeof(microtcp_header_t));
+    assert(data != NULL);
+    for(i = 0; i < chunks; i++){
+      seq_number++;
+
+      header = create_header(seq_number, (uint16_t)0, 0, 0, MICROTCP_MSS, 0);
+
+      memset(data,0,MICROTCP_MSS+sizeof(microtcp_header_t));
+
+      memcpy(data,&header,sizeof(microtcp_header_t));
+      memcpy(data+sizeof(microtcp_header_t),buffer+data_sent,MICROTCP_MSS);
+
+      header.checksum=htonl(crc32((const uint8_t *)data, MICROTCP_MSS+sizeof(microtcp_header_t)));
+
+      memset(data,0,MICROTCP_MSS+sizeof(microtcp_header_t));
+
+      memcpy(data,&header,sizeof(microtcp_header_t));
+      memcpy(data+sizeof(microtcp_header_t),buffer+data_sent,MICROTCP_MSS);
+      if(sendto(socket->sd,(void*)data,MICROTCP_MSS+sizeof(microtcp_header_t),0,(struct sockaddr*)socket->address,socket->address_len)<0){
+        perror("Cant send data");
+        socket->state=INVALID;
+        return -1;
+      }
+      data_sent+=MICROTCP_MSS;
+    }
+    free(data);
+  /* Check if there is a semi -filled chunk */
+    if(bytes_to_send % MICROTCP_MSS){
+      chunks++;
+      seq_number++;
+      header = create_header(seq_number, (uint16_t)0, 0, 0, bytes_to_send % MICROTCP_MSS, 0);
+      data=malloc((bytes_to_send %MICROTCP_MSS)+sizeof(microtcp_header_t));
+      assert(data != NULL);
+      memcpy(data, &header, sizeof(microtcp_header_t));
+      memcpy(data+sizeof(microtcp_header_t), buffer+data_sent, bytes_to_send % MICROTCP_MSS);
+      header.checksum=htonl(crc32((const uint8_t *)data, MICROTCP_MSS+sizeof(microtcp_header_t)));
+      memset(data,0,(bytes_to_send%MICROTCP_MSS)+sizeof(microtcp_header_t));
+      memcpy(data, &header, sizeof(microtcp_header_t));
+      memcpy(data+sizeof(microtcp_header_t), buffer+data_sent, bytes_to_send % MICROTCP_MSS);
+      if(sendto(socket->sd,(void*)data,(bytes_to_send%MICROTCP_MSS)+sizeof(microtcp_header_t),0,(struct sockaddr*)socket->address,socket->address_len)<0){
+          perror("Cant send data");
+          socket->state=INVALID;
+          return -1;
+      }
+      data_sent+=(bytes_to_send%MICROTCP_MSS);
+      free(data);
+    }
+/* Get the ACKs */
+  for(i = 0; i < chunks; i++){
+    recvfrom(...);
+  }
+/* Retransmissions */
+/* Update window */
+/* Update congestion control */
+  remaining -= bytes_to_send;
+
+  data_sent += bytes_to_send;
+
+  }
+  return data_sent;
 }
 
 ssize_t
