@@ -413,7 +413,8 @@ microtcp_send (microtcp_sock_t *socket, const void *buffer, size_t length,
 {
   microtcp_header_t header;
   uint32_t temp;
-  size_t i, tmp_data, sent, res;
+  size_t i, tmp_data, sent;
+  ssize_t res;
   size_t seq_number=socket->seq_number;
   size_t ack_number=socket->ack_number;
   size_t remaining=length;
@@ -505,7 +506,7 @@ microtcp_send (microtcp_sock_t *socket, const void *buffer, size_t length,
       header.checksum=0;
       if((uint32_t) temp != crc32((const uint8_t *) &header, sizeof(microtcp_header_t))){
         perror("Received packet destroyed");
-        clear();
+       clear();
         i--;
         continue;
       }
@@ -513,7 +514,8 @@ microtcp_send (microtcp_sock_t *socket, const void *buffer, size_t length,
       header = reverse(header);
       if(header.control != (uint16_t) 8){
         perror("Packet has not ACK=1");
-        i--;
+        fprintf(stderr, "%d ", header.control);
+       i--;
       }else{
         socket->curr_win_size = header.window;
         /* Checking for the amount of duplicate ACK packets */
@@ -583,13 +585,16 @@ microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags)
   size_t ack_number=socket->ack_number;
   size_t data_received=0;
   uint32_t tmp;
+  size_t j=0;
+  size_t buf=0;
   void *pkg=malloc(sizeof(microtcp_header_t)+MICROTCP_MSS);
   void *data=malloc(MICROTCP_MSS);
+  void *rec_buff=malloc(MICROTCP_RECVBUF_LEN);
   microtcp_header_t header;
   struct timeval timeout;
   timeout.tv_sec = 0;
   timeout.tv_usec = MICROTCP_ACK_TIMEOUT_US;
-  for(int i=1;TRUE; i++){
+  for(size_t i=1;TRUE; i++){
     if(setsockopt(socket->sd , SOL_SOCKET ,SO_RCVTIMEO , &timeout, sizeof(struct timeval)) < 0) {
 				perror("timeout");
 				socket->state = INVALID;
@@ -608,7 +613,7 @@ microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags)
 				}
 
       }else{
-        memcpy(&header,pkg, sizeof(microtcp_header));
+        memcpy(&header,pkg, sizeof(microtcp_header_t));
         memcpy(data,pkg+sizeof(microtcp_header_t),MICROTCP_MSS);
         tmp=ntohl(header.checksum);
         header.checksum=0;
@@ -616,9 +621,37 @@ microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags)
           perror("Received packet destroyed");
         }
         header=reverse(header);
+        if(header.control==(uint16_t)9){
+          socket->seq_number=header.seq_number;
+          socket->state=CLOSING_BY_PEER;
+          if(j){
+              memcpy(buffer+buf,rec_buff,j);
+          }
+          return data_received;
+        }
+        if(header.seq_number == seq_number){
+          memcpy(rec_buff+j,data,header.data_len);
+          data_received+=header.data_len;
+          j+=header.data_len;
+          seq_number++;
+        }
+        header=create_header(ack_number,(uint16_t)8,header.data_len,seq_number,MICROTCP_RECVBUF_LEN-j,0);
+        memcpy(data, &header, sizeof(microtcp_header_t));
+        header.checksum=htonl(crc32((const uint8_t *)data,sizeof(microtcp_header_t)));
+        memset(data,0,MICROTCP_MSS);
+        if (sendto(socket->sd,(void *)&header,sizeof(microtcp_header_t),0,(struct sockaddr *)&socket->address,socket->address_len) <0){
+						socket->state=INVALID;
+						perror("cant sendto");
+				}
 
       }
+
   }
+  socket->seq_number=seq_number;
+  if(j!=0){
+    memcpy(buffer+buf,rec_buff,j);
+  }
+  return data_received;
 }
 void add(uint32_t ack){
   //add elements to end of list and include if list is empty

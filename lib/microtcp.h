@@ -75,7 +75,7 @@ typedef struct
                                      is freed at the shutdown of the connection. This buffer is used
                                      to retrieve the data from the network. */
   size_t buf_fill_level;        /**< Amount of data in the buffer */
-  struct sockaddr *address;
+  struct sockaddr* address;
   socklen_t address_len;
   size_t cwnd;
   size_t ssthresh;
