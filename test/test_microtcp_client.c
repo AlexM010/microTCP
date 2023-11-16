@@ -22,9 +22,35 @@
  * You can use this file to write a test microTCP client.
  * This file is already inserted at the build system.
  */
-
+#include <stdint.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include "../lib/microtcp.h"
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h> // for close
 int
 main(int argc, char **argv)
 {
+    microtcp_sock_t socket;
+    int domain=AF_INET;
+    int type=SOCK_DGRAM;
+    int protocol=0;
+    socket=microtcp_socket(domain,type,protocol);
+    struct sockaddr_in servaddr ;
 
+    memset(&servaddr, 0, sizeof(struct sockaddr_in));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(argv[1]);
+    servaddr.sin_port = htons(atoi(argv[2]));
+   
+    // connect the client socket to server socket
+    if (microtcp_connect(&socket,(struct sockaddr *) &servaddr, sizeof(struct sockaddr_in))) {
+        printf("connection with the server failed...\n");
+        exit(0);
+    }
+
+    return 0;
 }

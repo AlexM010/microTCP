@@ -43,6 +43,7 @@
  */
 typedef enum
 {
+  UNKNOWN,
   LISTEN,
   ESTABLISHED,
   CLOSING_BY_PEER,
