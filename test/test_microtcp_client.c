@@ -1,3 +1,13 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include "../lib/microtcp.h"
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h> // for close
+/*
 /*
  * microtcp, a lightweight implementation of TCP for teaching,
  * and academic purposes.
@@ -34,6 +44,7 @@
 int
 main(int argc, char **argv)
 {
+<<<<<<< HEAD
     microtcp_sock_t socket;
     int domain=AF_INET;
     int type=SOCK_DGRAM;
@@ -59,5 +70,26 @@ main(int argc, char **argv)
     microtcp_shutdown(&socket,CLIENT);
     printf("Connection closed\n");
     close(socket.sd);
+=======
+    microtcp_sock_t sock=microtcp_socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP) ;
+    struct sockaddr_in servaddr ;
+
+    memset(&servaddr, 0, sizeof(struct sockaddr_in));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(argv[1]);
+    servaddr.sin_port = htons(atoi(argv[2]));
+   
+    // connect the client socket to server socket
+    if (microtcp_connect(&sock,(struct sockaddr *) &servaddr, sizeof(struct sockaddr_in)) != 0) {
+        printf("connection with the server failed...\n");
+        exit(0);
+    }else
+        printf("connected to the server..\n");
+      if(microtcp_shutdown(&sock,SHUT_RDWR) ==-1){
+        perror("shutdown");
+        exit(EXIT_FAILURE);
+    }
+    printf("TCP connection closed\n");
+>>>>>>> aef75777c1c63ed8ba309c7ee1b834628eab0de0
     return 0;
 }
