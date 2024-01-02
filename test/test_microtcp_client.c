@@ -51,6 +51,13 @@ main(int argc, char **argv)
         printf("connection with the server failed...\n");
         exit(0);
     }
+    printf("TCP Connection Established\n");
+    
+    //print message for shutdown and closing connection
+    printf("Closing connection\n");
 
+    microtcp_shutdown(&socket,CLIENT);
+    printf("Connection closed\n");
+    close(socket.sd);
     return 0;
 }

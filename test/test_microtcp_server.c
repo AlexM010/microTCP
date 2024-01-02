@@ -30,6 +30,7 @@
 #include <string.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 int
 main(int argc, char **argv)
 {
@@ -45,10 +46,17 @@ main(int argc, char **argv)
     sin.sin_port=htons(40000);
     sin.sin_addr.s_addr=htonl(INADDR_ANY);
     microtcp_bind(&socket,(struct sockaddr*)&sin,sizeof(struct sockaddr_in));
-    if(microtcp_accept(&socket,&client,sizeof(struct sockaddr) ) == -1){
+    if(microtcp_accept(&socket,(struct sockaddr *)&client,sizeof(struct sockaddr) ) == -1){
         printf("Cannot accept\n");
         return -1;
     }else
         printf("TCP Connection Established\n");
+
+    //shutdown SERVER
+    printf("Closing connection\n");
+    microtcp_shutdown(&socket,SERVER);
+    //print
+    printf("Connection closed\n");
+    close(socket.sd);
     return 0;
 }

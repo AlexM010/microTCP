@@ -35,6 +35,12 @@
 #define MICROTCP_INIT_CWND (3 * MICROTCP_MSS)
 #define MICROTCP_INIT_SSTHRESH MICROTCP_WIN_SIZE
 
+#define SERVER 2
+#define CLIENT 1
+#define SYN 2
+#define ACK 8
+#define SYNACK 10
+#define FINACK 9
 /**
  * Possible states of the microTCP socket
  *
@@ -83,6 +89,10 @@ typedef struct
   uint64_t bytes_send;
   uint64_t bytes_received;
   uint64_t bytes_lost;
+  struct sockaddr *address;
+  socklen_t address_len;
+  int fun;
+  int fin;
 } microtcp_sock_t;
 
 

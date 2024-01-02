@@ -42,7 +42,7 @@ sig_handler(int signal)
 
 int
 main(int argc, char **argv) {
-  uint16_t port;
+  uint16_t port=0;
 
   /*
    * Register a signal handler so we can terminate the client with
