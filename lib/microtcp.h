@@ -24,7 +24,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
-#include <stddef.h>
 
 /*
  * Several useful constants
@@ -58,10 +57,7 @@ typedef enum
   CLOSED,
   INVALID
 } mircotcp_state_t;
-typedef enum{
-  TRUE,
-  FALSE
-}Bool;
+
 
 /**
  * This is the microTCP socket structure. It holds all the necessary
@@ -81,11 +77,10 @@ typedef struct
                                      is freed at the shutdown of the connection. This buffer is used
                                      to retrieve the data from the network. */
   size_t buf_fill_level;        /**< Amount of data in the buffer */
-  struct sockaddr* address;
-  socklen_t address_len;
+
   size_t cwnd;
   size_t ssthresh;
-  Bool shuts;
+
   size_t seq_number;            /**< Keep the state of the sequence number */
   size_t ack_number;            /**< Keep the state of the ack number */
   uint64_t packets_send;
@@ -117,19 +112,8 @@ typedef struct
   uint32_t future_use2;         /**< 32-bits for future use */
   uint32_t checksum;            /**< CRC-32 checksum, see crc32() in utils folder */
 } microtcp_header_t;
-struct node{
-  uint32_t ack;
-  struct node *next;
-}*list=NULL;
-void add(uint32_t ack);
-void clear();
-void pop();
-void print();
-enum duplicate{
-  NOT_DUPLICATE,
-  DUPLICATE,
-  T_DUPLICATE,
-}d;
+
+
 microtcp_sock_t
 microtcp_socket (int domain, int type, int protocol);
 
@@ -164,5 +148,5 @@ microtcp_send (microtcp_sock_t *socket, const void *buffer, size_t length,
 ssize_t
 microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags);
 
-microtcp_header_t create_header (uint32_t seq, uint16_t control, uint32_t data_len,  uint32_t ack, uint16_t window, uint32_t checksum);
+
 #endif /* LIB_MICROTCP_H_ */

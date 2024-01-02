@@ -530,7 +530,7 @@ ssize_t microtcp_send (microtcp_sock_t *socket, const void *buffer, size_t lengt
                   //print both
                   printf("Wrong ->Expected Acknowledgement Number : %d\n",calculated_ack);
                 }
-
+                print_header(header);
                 //slow start
                 if(socket->cwnd<=socket->ssthresh){
                   cwnd_inc=1;

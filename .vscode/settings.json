@@ -1,15 +1,7 @@
-<<<<<<< HEAD
 {
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "cstdlib": "c",
         "microtcp.h": "c"
     }
-=======
-{
-    "files.associations": {
-        "microtcp.h": "c"
-    },
-    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
->>>>>>> aef75777c1c63ed8ba309c7ee1b834628eab0de0
 }
