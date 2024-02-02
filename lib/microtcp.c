@@ -624,7 +624,7 @@ microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags){
       status=recvfrom(socket->sd,recv_buf,(MAX_PAYLOAD_SIZE)+sizeof(microtcp_header_t),flags,(struct sockaddr*)socket->address,&socket->address_len);
       if(status==-1){
           perror("receiving packet");
-          exit(EXIT_FAILURE);
+          return -EXIT_FAILURE;
       }
       memcpy(&packet,recv_buf,sizeof(microtcp_header_t));
       checksum=ntohl(packet.checksum);
@@ -634,7 +634,7 @@ microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags){
       memcpy(recv_buf,&packet,sizeof(microtcp_header_t));
        if(checksum != crc32((const uint8_t*)recv_buf,size)){
            perror("checksum error 9");
-           exit(EXIT_FAILURE);
+           continue;
       }
       packet=reverse(packet);
       if(packet.control==FINACK&&socket->fun==SERVER){
@@ -691,7 +691,7 @@ microtcp_recv (microtcp_sock_t *socket, void *buffer, size_t length, int flags){
           }
           //copy recvbuf to socket->recvbuf
       }
-      if( socket->buf_fill_level+(MAX_PAYLOAD_SIZE)>length){
+      if(socket->buf_fill_level+(MAX_PAYLOAD_SIZE)>length){
         memcpy(buffer,socket->recvbuf+start_buf_level,socket->buf_fill_level-start_buf_level);
         //print the return
         int retval=socket->buf_fill_level-start_buf_level;
